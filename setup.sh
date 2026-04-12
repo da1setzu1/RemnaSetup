@@ -316,38 +316,52 @@ install_remnanode() {
     mkdir -p /opt/remnanode
     cd /opt/remnanode || exit 1
 
-    info "Скачивание docker-compose.yml..."
-    curl -fsSL \
-        "https://raw.githubusercontent.com/remnawave/node/refs/heads/main/docker-compose-prod.yml" \
-        -o docker-compose.yml
+    echo ""
+    echo -e "  ${YELLOW}${BOLD}╔══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "  ${YELLOW}${BOLD}║         ПОЛУЧИТЕ КОНФИГ ИЗ ПАНЕЛИ REMNAWAVE                  ║${NC}"
+    echo -e "  ${YELLOW}${BOLD}╠══════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "  ${YELLOW}${BOLD}║                                                              ║${NC}"
+    echo -e "  ${YELLOW}${BOLD}║  1. Войдите в панель RemnaWave                               ║${NC}"
+    echo -e "  ${YELLOW}${BOLD}║  2. Nodes → Management → Add Node                           ║${NC}"
+    echo -e "  ${YELLOW}${BOLD}║  3. Заполните форму создания ноды                            ║${NC}"
+    echo -e "  ${YELLOW}${BOLD}║  4. Скопируйте содержимое docker-compose.yml из панели       ║${NC}"
+    echo -e "  ${YELLOW}${BOLD}║                                                              ║${NC}"
+    echo -e "  ${YELLOW}${BOLD}║  Когда скопируете — вернитесь сюда и нажмите Enter           ║${NC}"
+    echo -e "  ${YELLOW}${BOLD}╚══════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    read -rp "  Нажмите Enter чтобы открыть редактор..."
 
-    if [ ! -f .env ]; then
-        echo ""
-        echo -e "  ${YELLOW}${BOLD}Настройка RemnaNode${NC}"
-        echo ""
-        read -rp "  Введите SECRET_KEY из панели Remnawave: " rn_secret
-        read -rp "  Введите порт для NODE (по умолчанию 2222): "  rn_port
-        rn_port="${rn_port:-2222}"
+    echo ""
+    info "Откроется nano — вставьте скопированный конфиг (Ctrl+Shift+V)"
+    info "Сохранение и выход: Ctrl+X → Y → Enter"
+    sleep 1
 
-        cat > .env << ENVEOF
-### VITALS ###
-NODE_PORT=${rn_port}
-SECRET_KEY=${rn_secret}
+    nano docker-compose.yml
 
-### Internal (local) ports
-XTLS_API_PORT=61000
-ENVEOF
-        ok "Файл .env создан"
-    else
-        warn "Файл .env уже существует, пропускаем создание"
+    if [ ! -s docker-compose.yml ]; then
+        err "Файл docker-compose.yml пустой или не создан! Установка прервана."
+        exit 1
     fi
 
-    docker compose pull
+    ok "Конфиг сохранён, запускаем RemnaNode..."
     docker compose up -d
 
-    ok "RemnaNode установлен и запущен!"
-    info "Директория: /opt/remnanode/"
-    info "Лог: docker logs -f remnanode"
+    echo ""
+    info "Последние логи контейнера:"
+    sleep 2
+    docker compose logs --tail=30
+
+    echo ""
+    echo -e "  ${GREEN}${BOLD}╔══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "  ${GREEN}${BOLD}║              REMNANODE УСПЕШНО ЗАПУЩЕН!                      ║${NC}"
+    echo -e "  ${GREEN}${BOLD}╠══════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "  ${GREEN}${BOLD}║                                                              ║${NC}"
+    echo -e "  ${GREEN}${BOLD}║  Вернитесь в панель RemnaWave и нажмите Next                 ║${NC}"
+    echo -e "  ${GREEN}${BOLD}║                                                              ║${NC}"
+    echo -e "  ${GREEN}${BOLD}║  Следить за логами:                                          ║${NC}"
+    echo -e "  ${GREEN}${BOLD}║  cd /opt/remnanode && docker compose logs -f -t              ║${NC}"
+    echo -e "  ${GREEN}${BOLD}╚══════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
 }
 
 # ============================================================
