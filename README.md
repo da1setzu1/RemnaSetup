@@ -190,10 +190,13 @@ cd /opt/remnanode && docker compose pull && docker compose up -d
 | filtering | `hostlist` | Обработка по списку доменов |
 | tpws transparent | `Y` | Основной метод обхода DPI |
 | nfqws | `N` | Не нужен при работающем tpws |
+| **firewall type** | **`iptables`** | **Совместимость с большинством VPS** |
 | LAN interface | `NONE` | VPS без локальной сети |
 | WAN interface | `ANY` | Весь входящий трафик |
 | auto download | `Y` | Автозагрузка списка доменов |
 | list type | `get_refilter_domains.sh` | Самый полный список (включает YouTube) |
+
+> Ошибки `Failed to disable/stop zapret.service` при установке — **это нормально**, так как сервис запускается впервые.
 
 Проверка после установки:
 ```bash

@@ -411,14 +411,19 @@ send "Y\r"
 expect -re {\(Y/N\) \?}
 send "N\r"
 
-# Q6: custom scripts — просто Enter (информационный блок)
+# Дальше установщик выводит инфо и задаёт вопрос о файрволле.
+# Ждём любой из следующих вопросов циклически пока не дойдём до LAN.
 expect {
-    -re {Make sure this is ok} { send "\r"; exp_continue }
-    -re {your choice \(default : NONE\) :} { }
+    -re {your choice \(default : nftables\) :} {
+        # Q6: тип файрволла → 1 (iptables)
+        send "1\r"
+        exp_continue
+    }
+    -re {your choice \(default : NONE\) :} {
+        # Q7: LAN interface → 1 (NONE)
+        send "1\r"
+    }
 }
-
-# Q7: LAN interface → 1 (NONE)
-send "1\r"
 
 # Q8: WAN interface → 1 (ANY)
 expect -re {your choice \(default : ANY\) :}
