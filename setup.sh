@@ -1,0 +1,477 @@
+#!/bin/bash
+# RemnaNodeSetup — Автоматическая установка
+# by Daisetzu1
+
+# ============================================================
+# ЦВЕТА И ПЕРЕМЕННЫЕ
+# ============================================================
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+GEO=""
+
+# ============================================================
+# УТИЛИТЫ
+# ============================================================
+ok()   { echo -e "${GREEN}[✓]${NC} $1"; }
+info() { echo -e "${CYAN}[→]${NC} $1"; }
+warn() { echo -e "${YELLOW}[!]${NC} $1"; }
+err()  { echo -e "${RED}[✗]${NC} $1"; }
+
+pause() {
+    echo ""
+    read -rp "  Нажмите Enter для продолжения..."
+}
+
+check_root() {
+    if [ "$EUID" -ne 0 ]; then
+        err "Запустите скрипт от имени root: sudo bash setup.sh"
+        exit 1
+    fi
+}
+
+# ============================================================
+# ВЫБОР ГЕО
+# ============================================================
+ask_geo() {
+    clear
+    echo -e "${CYAN}${BOLD}"
+    echo "  ╔══════════════════════════════════════════╗"
+    echo "  ║    На каком гео находится сервер?        ║"
+    echo "  ╠══════════════════════════════════════════╣"
+    echo "  ║                                          ║"
+    echo "  ║    1. Россия                             ║"
+    echo "  ║    2. Не Россия                          ║"
+    echo "  ║                                          ║"
+    echo "  ╚══════════════════════════════════════════╝"
+    echo -e "${NC}"
+    read -rp "  Введите цифру: " geo_choice
+
+    case "$geo_choice" in
+        1) GEO="russia" ;;
+        2) GEO="other"  ;;
+        *)
+            err "Неверный выбор, попробуйте снова"
+            sleep 1
+            ask_geo
+            ;;
+    esac
+}
+
+# ============================================================
+# БАННЕР
+# ============================================================
+show_banner() {
+    clear
+    local COLS
+    COLS=$(tput cols 2>/dev/null || echo 80)
+    echo -e "${GREEN}${BOLD}"
+    cat << 'BANNER'
+
+  ██████╗ ███████╗███╗   ███╗███╗   ██╗ █████╗
+  ██╔══██╗██╔════╝████╗ ████║████╗  ██║██╔══██╗
+  ██████╔╝█████╗  ██╔████╔██║██╔██╗ ██║███████║
+  ██╔══██╗██╔══╝  ██║╚██╔╝██║██║╚██╗██║██╔══██║
+  ██║  ██║███████╗██║ ╚═╝ ██║██║ ╚████║██║  ██║
+  ╚═╝  ╚═╝╚══════╝╚═╝     ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝
+
+  ███╗   ██╗ ██████╗ ██████╗ ███████╗
+  ████╗  ██║██╔═══██╗██╔══██╗██╔════╝
+  ██╔██╗ ██║██║   ██║██║  ██║█████╗
+  ██║╚██╗██║██║   ██║██║  ██║██╔══╝
+  ██║ ╚████║╚██████╔╝██████╔╝███████╗
+  ╚═╝  ╚═══╝ ╚═════╝ ╚═════╝ ╚══════╝
+
+  ███████╗███████╗████████╗██╗   ██╗██████╗
+  ██╔════╝██╔════╝╚══██╔══╝██║   ██║██╔══██╗
+  ███████╗█████╗     ██║   ██║   ██║██████╔╝
+  ╚════██║██╔══╝     ██║   ██║   ██║██╔═══╝
+  ███████║███████╗   ██║   ╚██████╔╝██║
+  ╚══════╝╚══════╝   ╚═╝    ╚═════╝ ╚═╝
+
+BANNER
+    echo -e "${NC}"
+    printf "%${COLS}s\n" "by Daisetzu1"
+    echo ""
+}
+
+# ============================================================
+# МЕНЮ
+# ============================================================
+show_menu() {
+    show_banner
+    echo -e "  ${WHITE}${BOLD}Выберите действие:${NC}"
+    echo ""
+    echo -e "  ${CYAN}1.${NC}  Установить все вместе (Откл IPv6, установка bbr, keepalive, fail2ban, ipset, remnanode)"
+    echo -e "  ${CYAN}2.${NC}  Отключение IPv6"
+    echo -e "  ${CYAN}3.${NC}  Установка BBR TCP"
+    echo -e "  ${CYAN}4.${NC}  SSH KeepAlive"
+    echo -e "  ${CYAN}5.${NC}  Fail2ban"
+    echo -e "  ${CYAN}6.${NC}  ipset"
+    echo -e "  ${CYAN}7.${NC}  Установка RemnaNode"
+    echo -e "  ${CYAN}8.${NC}  Установка Zapret (для ютуб)"
+    echo -e "  ${CYAN}9.${NC}  Оптимизация сервера (Откл IPv6, установка bbr, keepalive, fail2ban, ipset)"
+    echo ""
+    read -rp "  Введите цифру: " menu_choice
+
+    case "$menu_choice" in
+        1) install_all      ;;
+        2) disable_ipv6     ;;
+        3) install_bbr      ;;
+        4) install_keepalive ;;
+        5) install_fail2ban ;;
+        6) install_ipset    ;;
+        7) install_remnanode ;;
+        8) install_zapret   ;;
+        9) optimize_server  ;;
+        *)
+            err "Неверный выбор"
+            sleep 1
+            show_menu
+            ;;
+    esac
+}
+
+# ============================================================
+# 2. ОТКЛЮЧЕНИЕ IPv6
+# ============================================================
+disable_ipv6() {
+    info "Отключение IPv6..."
+
+    if grep -q "net.ipv6.conf.all.disable_ipv6" /etc/sysctl.conf; then
+        warn "IPv6 уже отключён в sysctl.conf, пропускаем"
+    else
+        cat >> /etc/sysctl.conf << 'EOF'
+net.ipv6.conf.all.disable_ipv6=1
+net.ipv6.conf.default.disable_ipv6=1
+net.ipv6.conf.lo.disable_ipv6=1
+EOF
+    fi
+
+    sysctl -p
+    ok "IPv6 отключён"
+}
+
+# ============================================================
+# 3. УСТАНОВКА BBR TCP
+# ============================================================
+install_bbr() {
+    info "Установка BBR TCP..."
+
+    if grep -q "net.ipv4.tcp_congestion_control=bbr" /etc/sysctl.conf; then
+        warn "BBR уже настроен в sysctl.conf, пропускаем"
+    else
+        cat >> /etc/sysctl.conf << 'EOF'
+net.core.default_qdisc=fq
+net.ipv4.tcp_congestion_control=bbr
+EOF
+    fi
+
+    sysctl -p
+    ok "BBR TCP установлен"
+}
+
+# ============================================================
+# 4. SSH KEEPALIVE
+# ============================================================
+install_keepalive() {
+    info "Настройка SSH KeepAlive..."
+
+    if grep -q "ClientAliveInterval" /etc/ssh/sshd_config; then
+        warn "SSH KeepAlive уже настроен, пропускаем"
+    else
+        echo "ClientAliveInterval 60"  >> /etc/ssh/sshd_config
+        echo "ClientAliveCountMax 10"  >> /etc/ssh/sshd_config
+    fi
+
+    systemctl restart sshd
+    ok "SSH KeepAlive настроен"
+}
+
+# ============================================================
+# 5. FAIL2BAN
+# ============================================================
+install_fail2ban() {
+    info "Установка Fail2ban..."
+
+    apt install -y fail2ban
+
+    cat > /etc/fail2ban/jail.local << 'EOF'
+[sshd]
+enabled  = true
+port     = ssh
+maxretry = 5
+bantime  = 3600
+findtime = 600
+EOF
+
+    systemctl enable fail2ban
+    systemctl restart fail2ban
+    ok "Fail2ban установлен и запущен"
+}
+
+# ============================================================
+# 6. IPSET (блокировка сканеров CyberOK/Skipa)
+# ============================================================
+install_ipset() {
+    info "Установка ipset и блокировки сканеров..."
+
+    apt install -y ipset curl
+
+    cat > /usr/local/bin/skipa-block.sh << 'BLOCKSCRIPT'
+#!/bin/bash
+
+IPT="iptables"
+IPSET_NAME="skipa_scan"
+
+ipset -exist create "$IPSET_NAME" hash:net maxelem 50000
+
+echo "Скачивание списка сканеров..."
+LIST=$(curl -s "https://antifilter.download/list/skipa.tsv" 2>/dev/null)
+
+if [ -z "$LIST" ]; then
+    echo "Ошибка: не удалось скачать список"
+    exit 1
+fi
+
+echo "Обновление ipset..."
+ipset flush "$IPSET_NAME"
+
+echo "$LIST" | grep -oP '^\d+\.\d+\.\d+\.\d+/\d+' | while read -r cidr; do
+    ipset add "$IPSET_NAME" "$cidr" 2>/dev/null
+done
+
+ADDED=$(ipset list "$IPSET_NAME" | grep -c '^[0-9]' || true)
+echo "Добавлено IP в ipset: $ADDED"
+
+$IPT -C INPUT -m set --match-set "$IPSET_NAME" src -j DROP 2>/dev/null || \
+    $IPT -I INPUT -m set --match-set "$IPSET_NAME" src -j DROP
+
+echo "Правила iptables обновлены"
+echo "Готово!"
+BLOCKSCRIPT
+
+    chmod +x /usr/local/bin/skipa-block.sh
+
+    /usr/local/bin/skipa-block.sh
+
+    cat > /etc/cron.d/skipa-block << 'CRON'
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+0 3 * * * root /usr/local/bin/skipa-block.sh > /dev/null 2>&1
+CRON
+
+    ok "ipset установлен, сканеры заблокированы"
+}
+
+# ============================================================
+# ВСПОМОГАТЕЛЬНАЯ: УСТАНОВКА DOCKER
+# ============================================================
+install_docker() {
+    info "Установка Docker..."
+
+    apt update && apt upgrade -y
+
+    if command -v docker &>/dev/null; then
+        warn "Docker уже установлен, пропускаем установку"
+    else
+        curl -fsSL https://get.docker.com | sh
+    fi
+
+    systemctl enable docker
+    systemctl start docker
+
+    if [ "$GEO" = "russia" ]; then
+        info "Настройка зеркал Docker (сервер в России)..."
+        mkdir -p /etc/docker
+        cat > /etc/docker/daemon.json << 'EOF'
+{
+  "registry-mirrors": [
+    "https://mirror.gcr.io",
+    "https://dockerhub.icu",
+    "https://docker.1panel.live"
+  ]
+}
+EOF
+        systemctl restart docker
+        ok "Зеркала Docker настроены"
+    fi
+
+    ok "Docker установлен и запущен"
+}
+
+# ============================================================
+# 7. УСТАНОВКА REMNANODE
+# ============================================================
+install_remnanode() {
+    info "Установка RemnaNode..."
+
+    install_docker
+
+    mkdir -p /opt/remnanode
+    cd /opt/remnanode || exit 1
+
+    info "Скачивание docker-compose.yml..."
+    curl -fsSL \
+        "https://raw.githubusercontent.com/remnawave/node/refs/heads/main/docker-compose-prod.yml" \
+        -o docker-compose.yml
+
+    if [ ! -f .env ]; then
+        echo ""
+        echo -e "  ${YELLOW}${BOLD}Настройка RemnaNode${NC}"
+        echo ""
+        read -rp "  Введите SECRET_KEY из панели Remnawave: " rn_secret
+        read -rp "  Введите порт для NODE (по умолчанию 2222): "  rn_port
+        rn_port="${rn_port:-2222}"
+
+        cat > .env << ENVEOF
+### VITALS ###
+NODE_PORT=${rn_port}
+SECRET_KEY=${rn_secret}
+
+### Internal (local) ports
+XTLS_API_PORT=61000
+ENVEOF
+        ok "Файл .env создан"
+    else
+        warn "Файл .env уже существует, пропускаем создание"
+    fi
+
+    docker compose pull
+    docker compose up -d
+
+    ok "RemnaNode установлен и запущен!"
+    info "Директория: /opt/remnanode/"
+    info "Лог: docker logs -f remnanode"
+}
+
+# ============================================================
+# 8. УСТАНОВКА ZAPRET
+# ============================================================
+install_zapret() {
+    info "Установка Zapret (обход блокировок YouTube)..."
+
+    apt update
+    apt install -y git gcc make libnetfilter-queue-dev \
+        libnfnetlink-dev zlib1g-dev libmnl-dev libcap-dev \
+        libsystemd-dev iptables ipset expect
+
+    cd /opt || exit 1
+    if [ -d "zapret" ]; then
+        warn "Директория /opt/zapret уже существует, удаляем..."
+        rm -rf zapret
+    fi
+
+    git clone https://github.com/bol-van/zapret
+    cd zapret || exit 1
+
+    info "Запуск автоматической установки Zapret..."
+
+    expect << 'EXPECT_SCRIPT'
+set timeout 300
+log_user 1
+spawn ./install_easy.sh
+
+# Q1: flow offloading → 1 (none)
+expect -re {your choice \(default : none\) :}
+send "1\r"
+
+# Q2: IPv6 support → N
+expect -re {\(Y/N\) \?}
+send "N\r"
+
+# Q3: filtering → 3 (hostlist)
+expect -re {your choice \(default : none\) :}
+send "3\r"
+
+# Q4: tpws transparent mode → Y
+expect -re {\(Y/N\) \?}
+send "Y\r"
+
+# Q5: nfqws → N
+expect -re {\(Y/N\) \?}
+send "N\r"
+
+# Q6: custom scripts — просто Enter (информационный блок)
+expect {
+    -re {Make sure this is ok} { send "\r"; exp_continue }
+    -re {your choice \(default : NONE\) :} { }
+}
+
+# Q7: LAN interface → 1 (NONE)
+send "1\r"
+
+# Q8: WAN interface → 1 (ANY)
+expect -re {your choice \(default : ANY\) :}
+send "1\r"
+
+# Q9: auto download → Y
+expect -re {\(Y/N\) \?}
+send "Y\r"
+
+# Q10: list type → 1 (get_refilter_domains.sh)
+expect -re {your choice}
+send "1\r"
+
+# Финал
+expect -re {press enter to continue}
+send "\r"
+
+expect eof
+EXPECT_SCRIPT
+
+    ok "Zapret установлен!"
+    echo ""
+    info "Проверка статуса:"
+    systemctl status zapret --no-pager || true
+    info "Таймер обновления:"
+    systemctl status zapret-list-update.timer --no-pager || true
+}
+
+# ============================================================
+# 9. ОПТИМИЗАЦИЯ СЕРВЕРА (без RemnaNode и Zapret)
+# ============================================================
+optimize_server() {
+    info "Оптимизация сервера..."
+    disable_ipv6
+    install_bbr
+    install_keepalive
+    install_fail2ban
+    install_ipset
+    ok "Оптимизация завершена!"
+}
+
+# ============================================================
+# 1. УСТАНОВИТЬ ВСЁ ВМЕСТЕ (без Zapret)
+# ============================================================
+install_all() {
+    info "Установка всего (Zapret не включён)..."
+    disable_ipv6
+    install_bbr
+    install_keepalive
+    install_fail2ban
+    install_ipset
+    install_remnanode
+    echo ""
+    ok "=========================================="
+    ok " Всё успешно установлено!"
+    ok " RemnaNode запущен: /opt/remnanode/"
+    ok "=========================================="
+}
+
+# ============================================================
+# ТОЧКА ВХОДА
+# ============================================================
+main() {
+    check_root
+    ask_geo
+    show_menu
+    pause
+}
+
+main
