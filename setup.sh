@@ -434,66 +434,150 @@ set timeout 300
 log_user 1
 spawn ./install_easy.sh
 
-# Q1: firewall type → nftables (2) или iptables (1)
+# Установщик может менять порядок вопросов, используем цикл для всех Y/N и choice
+# Порядок гарантированный: IPv6 → firewall → offloading → filtering → tpws socks → tpws transparent → edit options → nfqws → LAN → WAN → auto download → list type
+
+# Q1: IPv6 support → N (может не появляться на некоторых системах)
 expect {
-    -re {your choice \\(default : nftables\\) :} {
-        send "$FW_CHOICE\\r"
+    -re {enable ipv6 support.*\\(Y/N\\)} {
+        send "N\\r"
     }
-    -re {your choice \\(default : iptables\\) :} {
+    -re {select firewall type} {
         send "$FW_CHOICE\\r"
+        exp_continue
     }
 }
 
-# Q2: flow offloading → 1 (none)
-expect -re {your choice \\(default : none\\) :}
-send "1\\r"
+# Q2: firewall type (если не ответили выше)
+expect {
+    -re {select firewall type} {
+        send "$FW_CHOICE\\r"
+    }
+    -re {select flow offloading} {
+        send "1\\r"
+        exp_continue
+    }
+}
 
-# Q3: filtering → 3 (hostlist)
-expect -re {your choice \\(default : none\\) :}
-send "3\\r"
+# Q3: flow offloading → 1 (none)
+expect {
+    -re {select flow offloading} {
+        send "1\\r"
+    }
+    -re {select filtering} {
+        send "3\\r"
+        exp_continue
+    }
+}
 
-# Q4: tpws socks mode on port 987? → N
-expect -re {\(Y/N\) \\?}
-send "N\\r"
+# Q4: filtering → 3 (hostlist)
+expect {
+    -re {select filtering} {
+        send "3\\r"
+    }
+    -re {enable tpws socks mode} {
+        send "N\\r"
+        exp_continue
+    }
+}
 
-# Q5: tpws transparent mode? → Y
-expect -re {\(Y/N\) \\?}
-send "Y\\r"
+# Q5: tpws socks mode → N
+expect {
+    -re {enable tpws socks mode} {
+        send "N\\r"
+    }
+    -re {enable tpws transparent mode} {
+        send "Y\\r"
+        exp_continue
+    }
+}
 
-# Q6: edit options? → N
-expect -re {\(Y/N\) \\?}
-send "N\\r"
+# Q6: tpws transparent mode → Y
+expect {
+    -re {enable tpws transparent mode} {
+        send "Y\\r"
+    }
+    -re {do you want to edit the options} {
+        send "N\\r"
+        exp_continue
+    }
+}
 
-# Q7: enable nfqws? → N
-expect -re {\(Y/N\) \\?}
-send "N\\r"
+# Q7: edit options → N
+expect {
+    -re {do you want to edit the options} {
+        send "N\\r"
+    }
+    -re {enable nfqws} {
+        send "N\\r"
+        exp_continue
+    }
+}
 
-# Q8: LAN interface → auto-detected
-expect -re {your choice \\(default : NONE\\) :}
-send "$IFACE_NUM\\r"
+# Q8: nfqws → N
+expect {
+    -re {enable nfqws} {
+        send "N\\r"
+    }
+    -re {LAN interface} {
+        send "$IFACE_NUM\\r"
+        exp_continue
+    }
+}
 
-# Q9: WAN interface → auto-detected
-expect -re {your choice \\(default : ANY\\) :}
-send "$IFACE_NUM\\r"
+# Q9: LAN interface → auto-detected
+expect {
+    -re {LAN interface} {
+        send "$IFACE_NUM\\r"
+    }
+    -re {WAN interface} {
+        send "$IFACE_NUM\\r"
+        exp_continue
+    }
+}
 
-# Q10: auto download ip/host list? → Y
-expect -re {\(Y/N\) \\?}
-send "y\\r"
+# Q10: WAN interface → auto-detected
+expect {
+    -re {WAN interface} {
+        send "$IFACE_NUM\\r"
+    }
+    -re {auto download} {
+        send "Y\\r"
+        exp_continue
+    }
+}
 
-# Q11: list type → 2 (get_antizapret_domains.sh)
-expect -re {your choice}
-send "2\\r"
+# Q11: auto download → Y
+expect {
+    -re {auto download} {
+        send "Y\\r"
+    }
+    -re {your choice.*antizapret} {
+        send "2\\r"
+        exp_continue
+    }
+}
+
+# Q12: list type → 2 (antizapret)
+expect {
+    -re {your choice.*get_antizapret} {
+        send "2\\r"
+    }
+    -re {your choice} {
+        send "2\\r"
+    }
+}
 
 # Финал — ждём завершения
 expect {
     -re {press enter to continue} {
         send "\\r"
     }
-    -re {\* starting zapret service} {
+    -re {starting zapret service} {
         # Сервис стартовал
     }
     timeout {
-        puts "\nWARNING: expect timed out waiting for install_easy.sh"
+        puts "\nWARNING: expect timed out"
     }
 }
 
