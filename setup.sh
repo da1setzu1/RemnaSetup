@@ -482,15 +482,15 @@ expect {
         send "Y\r"
         exp_continue
     }
-    -re {get_antizapret} {
+    -re {your choice.*get_antizapret} {
         send "2\r"
         exp_continue
     }
-    -re {get_refilter} {
+    -re {your choice.*get_refilter} {
         send "1\r"
         exp_continue
     }
-    -re {get_reestr} {
+    -re {your choice.*get_reestr} {
         send "3\r"
         exp_continue
     }
