@@ -406,13 +406,14 @@ install_zapret() {
     info "Основной интерфейс: $MAIN_IFACE"
 
     # Определяем выбор интерфейса (номер в меню)
+    # В меню zapret первым идёт NONE/ANY, поэтому +1 к номеру интерфейса
     IFACE_NUM="1"
     local ifaces
     ifaces=$(ls /sys/class/net/ | grep -vE '^(lo)$')
     local num=1
     for if_name in $ifaces; do
         if [ "$if_name" = "$MAIN_IFACE" ]; then
-            IFACE_NUM="$num"
+            IFACE_NUM="$((num + 1))"
             break
         fi
         num=$((num + 1))
@@ -445,7 +446,7 @@ expect {
         send "$FW_CHOICE\r"
         exp_continue
     }
-    -re {flow offloading} {
+    -re {select flow offloading} {
         send "1\r"
         exp_continue
     }
