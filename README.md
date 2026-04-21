@@ -177,31 +177,52 @@ cd /opt/remnanode && docker compose pull && docker compose up -d
 
 ---
 
-### 8. Установка Zapret (YouTube)
+### 8. Установка Zapret (обход DPI-блокировок)
 
-Устанавливает [zapret](https://github.com/bol-van/zapret) — обход DPI-блокировок для YouTube и других сервисов.
+Устанавливает [zapret](https://github.com/bol-van/zapret) — обход DPI-блокировок (YouTube, Discord, Telegram и др.).
 
-Установка **полностью автоматизирована** через `expect`. Ответы на все вопросы установщика выставлены оптимально:
+Установка **полностью автоматизирована** через `expect`. Скрипт автоматически:
+
+- Определяет **основной сетевой интерфейс** (eth0, ens3 и т.д.) — больше не нужно выбирать вручную
+- Определяет **тип файрволла**: `nftables` если доступен (Ubuntu 22.04+), иначе `iptables`
+
+Ответы на все вопросы установщика:
 
 | Вопрос | Ответ | Причина |
 |--------|-------|---------|
+| **firewall type** | **авто** (`nftables` или `iptables`) | **Определяется автоматически по ОС** |
 | flow offloading | `none` | Универсальный режим |
-| IPv6 support | `N` | IPv6 отключён |
 | filtering | `hostlist` | Обработка по списку доменов |
+| tpws socks mode | `N` | SOCKS-прокси не нужен |
 | tpws transparent | `Y` | Основной метод обхода DPI |
+| edit options | `N` | Параметры по умолчанию |
 | nfqws | `N` | Не нужен при работающем tpws |
-| **firewall type** | **`iptables`** | **Совместимость с большинством VPS** |
-| LAN interface | `NONE` | VPS без локальной сети |
-| WAN interface | `ANY` | Весь входящий трафик |
+| **LAN interface** | **авто** | **Определяется автоматически** |
+| **WAN interface** | **авто** | **Определяется автоматически** |
 | auto download | `Y` | Автозагрузка списка доменов |
-| list type | `get_refilter_domains.sh` | Самый полный список (включает YouTube) |
+| list type | `get_antizapret_domains.sh` | Самый популярный список |
 
 > Ошибки `Failed to disable/stop zapret.service` при установке — **это нормально**, так как сервис запускается впервые.
+> Ошибка `gzip: stdin: unexpected end of file` при скачивании списка — временная проблема с источником, список обновится по таймеру или вручную.
 
 Проверка после установки:
 ```bash
 systemctl status zapret --no-pager
 systemctl status zapret-list-update.timer --no-pager
+```
+
+Ручное обновление списка доменов:
+```bash
+cd /opt/zapret && sudo ./get_antizapret_domains.sh && sudo systemctl restart zapret
+```
+
+Добавление своих доменов в список:
+```bash
+sudo nano /opt/zapret/ipset/zapret-hosts-user.txt
+# по одному домену на строку, например:
+# discord.com
+# discordapp.com
+sudo systemctl restart zapret
 ```
 
 ---

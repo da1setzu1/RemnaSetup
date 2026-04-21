@@ -365,91 +365,159 @@ install_remnanode() {
 }
 
 # ============================================================
+# ВСПОМОГАТЕЛЬНАЯ: ОПРЕДЕЛЕНИЕ ОСНОВНОГО ИНТЕРФЕЙСА
+# ============================================================
+detect_main_iface() {
+    local iface
+    # Приоритет: eth0 > ens* > первый не-lo интерфейс
+    iface=$(ip route show default | awk '/default/ {for(i=1;i<=NF;i++) if($i=="dev") print $(i+1)}' | head -1)
+    if [ -z "$iface" ]; then
+        iface=$(ls /sys/class/net/ | grep -vE '^(lo|docker|br-)' | head -1)
+    fi
+    if [ -z "$iface" ]; then
+        iface="eth0"
+    fi
+    echo "$iface"
+}
+
+# ============================================================
 # 8. УСТАНОВКА ZAPRET
 # ============================================================
 install_zapret() {
-    info "Установка Zapret (обход блокировок YouTube)..."
+    info "Установка Zapret (обход DPI-блокировок)..."
 
     apt update
     apt install -y git gcc make libnetfilter-queue-dev \
-        libnfnetlink-dev zlib1g-dev libmnl-dev libcap-dev \
+        libnfnetlink-dev libnftnl-dev zlib1g-dev libmnl-dev libcap-dev \
         libsystemd-dev iptables ipset expect
 
     cd /opt || exit 1
     if [ -d "zapret" ]; then
         warn "Директория /opt/zapret уже существует, удаляем..."
+        systemctl stop zapret 2>/dev/null || true
         rm -rf zapret
     fi
 
     git clone https://github.com/bol-van/zapret
     cd zapret || exit 1
 
+    # Определяем основной сетевой интерфейс
+    MAIN_IFACE=$(detect_main_iface)
+    info "Основной интерфейс: $MAIN_IFACE"
+
+    # Определяем выбор интерфейса (номер в меню)
+    IFACE_NUM="1"
+    local ifaces
+    ifaces=$(ls /sys/class/net/ | grep -vE '^(lo)$')
+    local num=1
+    for if_name in $ifaces; do
+        if [ "$if_name" = "$MAIN_IFACE" ]; then
+            IFACE_NUM="$num"
+            break
+        fi
+        num=$((num + 1))
+    done
+
+    # Определяем тип файрволла: nftables для Ubuntu 22.04+, иначе iptables
+    FW_CHOICE="2"
+    if command -v nft &>/dev/null && nft list ruleset &>/dev/null; then
+        FW_CHOICE="2"  # nftables
+    else
+        FW_CHOICE="1"  # iptables
+    fi
+    info "Тип файрволла: $([ "$FW_CHOICE" = "2" ] && echo 'nftables' || echo 'iptables')"
+
     info "Запуск автоматической установки Zapret..."
 
-    expect << 'EXPECT_SCRIPT'
+    expect << EXPECT_SCRIPT
 set timeout 300
 log_user 1
 spawn ./install_easy.sh
 
-# Q1: flow offloading → 1 (none)
-expect -re {your choice \(default : none\) :}
-send "1\r"
-
-# Q2: IPv6 support → N
-expect -re {\(Y/N\) \?}
-send "N\r"
-
-# Q3: filtering → 3 (hostlist)
-expect -re {your choice \(default : none\) :}
-send "3\r"
-
-# Q4: tpws transparent mode → Y
-expect -re {\(Y/N\) \?}
-send "Y\r"
-
-# Q5: nfqws → N
-expect -re {\(Y/N\) \?}
-send "N\r"
-
-# Дальше установщик выводит инфо и задаёт вопрос о файрволле.
-# Ждём любой из следующих вопросов циклически пока не дойдём до LAN.
+# Q1: firewall type → nftables (2) или iptables (1)
 expect {
-    -re {your choice \(default : nftables\) :} {
-        # Q6: тип файрволла → 1 (iptables)
-        send "1\r"
-        exp_continue
+    -re {your choice \\(default : nftables\\) :} {
+        send "$FW_CHOICE\\r"
     }
-    -re {your choice \(default : NONE\) :} {
-        # Q7: LAN interface → 1 (NONE)
-        send "1\r"
+    -re {your choice \\(default : iptables\\) :} {
+        send "$FW_CHOICE\\r"
     }
 }
 
-# Q8: WAN interface → 1 (ANY)
-expect -re {your choice \(default : ANY\) :}
-send "1\r"
+# Q2: flow offloading → 1 (none)
+expect -re {your choice \\(default : none\\) :}
+send "1\\r"
 
-# Q9: auto download → Y
-expect -re {\(Y/N\) \?}
-send "Y\r"
+# Q3: filtering → 3 (hostlist)
+expect -re {your choice \\(default : none\\) :}
+send "3\\r"
 
-# Q10: list type → 1 (get_refilter_domains.sh)
+# Q4: tpws socks mode on port 987? → N
+expect -re {\(Y/N\) \\?}
+send "N\\r"
+
+# Q5: tpws transparent mode? → Y
+expect -re {\(Y/N\) \\?}
+send "Y\\r"
+
+# Q6: edit options? → N
+expect -re {\(Y/N\) \\?}
+send "N\\r"
+
+# Q7: enable nfqws? → N
+expect -re {\(Y/N\) \\?}
+send "N\\r"
+
+# Q8: LAN interface → auto-detected
+expect -re {your choice \\(default : NONE\\) :}
+send "$IFACE_NUM\\r"
+
+# Q9: WAN interface → auto-detected
+expect -re {your choice \\(default : ANY\\) :}
+send "$IFACE_NUM\\r"
+
+# Q10: auto download ip/host list? → Y
+expect -re {\(Y/N\) \\?}
+send "y\\r"
+
+# Q11: list type → 2 (get_antizapret_domains.sh)
 expect -re {your choice}
-send "1\r"
+send "2\\r"
 
-# Финал
-expect -re {press enter to continue}
-send "\r"
+# Финал — ждём завершения
+expect {
+    -re {press enter to continue} {
+        send "\\r"
+    }
+    -re {\* starting zapret service} {
+        # Сервис стартовал
+    }
+    timeout {
+        puts "\nWARNING: expect timed out waiting for install_easy.sh"
+    }
+}
 
 expect eof
 EXPECT_SCRIPT
 
-    ok "Zapret установлен!"
+    if [ $? -eq 0 ]; then
+        ok "Zapret установлен!"
+    else
+        warn "Установка завершилась с предупреждениями, проверяем статус..."
+    fi
+
     echo ""
     info "Проверка статуса:"
     systemctl status zapret --no-pager || true
+    echo ""
     info "Таймер обновления:"
     systemctl status zapret-list-update.timer --no-pager || true
+    echo ""
+    info "Управление:"
+    echo "  Проверка:    sudo systemctl status zapret"
+    echo "  Перезапуск:  sudo systemctl restart zapret"
+    echo "  Обновление списка: cd /opt/zapret && sudo ./get_antizapret_domains.sh && sudo systemctl restart zapret"
+    echo "  Ручное добавление доменов: sudo nano /opt/zapret/ipset/zapret-hosts-user.txt"
 }
 
 # ============================================================
