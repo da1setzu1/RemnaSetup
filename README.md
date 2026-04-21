@@ -75,8 +75,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/da1setzu1/RemnaSetup/main/se
 ## Что делает каждый пункт
 
 ### 1. Установить всё вместе
-Запускает по порядку: **2 → 3 → 4 → 5 → 6 → 7**.  
-**Zapret не включён** — его нужно ставить отдельно (пункт 8).
+Запускает по порядку: **2 → 3 → 4 → 5 → 6 → 7 → 8** — всё включено: IPv6, BBR, KeepAlive, Fail2ban, ipset, RemnaNode и Zapret.
 
 ---
 

@@ -107,7 +107,7 @@ show_menu() {
     show_banner
     echo -e "  ${WHITE}${BOLD}Выберите действие:${NC}"
     echo ""
-    echo -e "  ${CYAN}1.${NC}  Установить все вместе (Откл IPv6, установка bbr, keepalive, fail2ban, ipset, remnanode)"
+    echo -e "  ${CYAN}1.${NC}  Установить все вместе (IPv6, bbr, keepalive, fail2ban, ipset, remnanode, zapret)"
     echo -e "  ${CYAN}2.${NC}  Отключение IPv6"
     echo -e "  ${CYAN}3.${NC}  Установка BBR TCP"
     echo -e "  ${CYAN}4.${NC}  SSH KeepAlive"
@@ -115,7 +115,7 @@ show_menu() {
     echo -e "  ${CYAN}6.${NC}  ipset"
     echo -e "  ${CYAN}7.${NC}  Установка RemnaNode"
     echo -e "  ${CYAN}8.${NC}  Установка Zapret (для ютуб)"
-    echo -e "  ${CYAN}9.${NC}  Оптимизация сервера (Откл IPv6, установка bbr, keepalive, fail2ban, ipset)"
+    echo -e "  ${CYAN}9.${NC}  Оптимизация сервера (IPv6, bbr, keepalive, fail2ban, ipset)"
     echo ""
     read -rp "  Введите цифру: " menu_choice
 
@@ -534,20 +534,22 @@ optimize_server() {
 }
 
 # ============================================================
-# 1. УСТАНОВИТЬ ВСЁ ВМЕСТЕ (без Zapret)
+# 1. УСТАНОВИТЬ ВСЁ ВМЕСТЕ
 # ============================================================
 install_all() {
-    info "Установка всего (Zapret не включён)..."
+    info "Установка всего..."
     disable_ipv6
     install_bbr
     install_keepalive
     install_fail2ban
     install_ipset
     install_remnanode
+    install_zapret
     echo ""
     ok "=========================================="
     ok " Всё успешно установлено!"
-    ok " RemnaNode запущен: /opt/remnanode/"
+    ok " RemnaNode:  /opt/remnanode/"
+    ok " Zapret:    /opt/zapret/"
     ok "=========================================="
 }
 
